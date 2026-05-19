@@ -265,6 +265,7 @@ class SurvivalModel:
         employee_count: int,
         horizon: str,
         forecast_year: int = 2023,
+        return_breakdown: bool = False,
     ) -> float:
         """
         Compute adjusted survival probability for a specific business in a county.
@@ -312,7 +313,24 @@ class SurvivalModel:
         )
 
         adjusted = 1.0 / (1.0 + np.exp(-(logit_base + logit_adj)))
-        return float(np.clip(adjusted, 0.01, 0.98))
+        prob = float(np.clip(adjusted, 0.01, 0.98))
+
+        # if we want the 7 breakdowns, return a dictionary with them
+        if return_breakdown: 
+            return {
+                "survival_prob" : prob,
+                "breakdown": {
+                    "base_rate": round(base, 4),
+                    "age_multiplier": round(age_mult, 4),
+                    "size_multiplier":  round(size_mult, 4),
+                    "emp_trend":        round(emp_trend_m, 4),
+                    "wage_health":      round(wage_m, 4),
+                    "income_level":     round(income_m, 4),
+                    "market_saturation":round(saturation_m, 4),
+                    "emp_volatility":   round(volatility_m, 4),
+                }
+            }
+        return prob
 
 
 # -------------------------------------------------------------------

@@ -62,7 +62,7 @@ def score_all_counties(
     results          = []
     static_forecasts = _load_static_forecasts(static_forecasts_path)
 
-    init_survival_model(qcew_path=qcew_path, merged_path="data/merged_data_v2.csv")
+    model = init_survival_model(qcew_path=qcew_path, merged_path="data/merged_data_v2.csv")
 
     print(f"\nScoring {len(counties)} counties for '{sector}' ({horizon} horizon)...")
     print(f"Business: {employee_count} employees, ${current_revenue:,.0f} revenue, age {business_age}yr")
@@ -99,14 +99,17 @@ def score_all_counties(
                 ],
             }
 
-            p_survival = compute_survival_probability(
+            survival_result = model.compute(
                 sector=sector,
                 county=county,
                 business_age_years=business_age,
                 employee_count=employee_count,
                 horizon=horizon,
                 forecast_year=BASE_DATA_YEAR,
+                return_breakdown=True,
             )
+            p_survival        = survival_result["survival_prob"]
+            survival_breakdown = survival_result["breakdown"]
 
             revenue_score = fc["revenue_score"]
             total_growth  = fc["total_growth"]
@@ -143,6 +146,7 @@ def score_all_counties(
                 "p_strong":            round(class_probs[3], 3) if class_probs[3] is not None else None,
                 "status":              "ok",
                 "notes":               "pop_dampened" if county_pop and county_pop < POP_DAMPEN_THRESHOLD else "",
+                "survival_breakdown": survival_breakdown,
             })
 
         except Exception as e:
@@ -203,6 +207,7 @@ def score_all_counties(
     cols = ["rank", "id", "county", "population", "score", "tier", "survival_prob", "revenue_score",
             "projected_revenue", "sector_growth_pct", "annual_growth_rate",
             "economic_adjustment", "p_shrinking", "p_flat", "p_moderate", "p_strong",
+            "survival_breakdown",
             "status", "notes"]
     df_out = df_out[[c for c in cols if c in df_out.columns]]
 
