@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TerraTrends — Georgia County Expansion Advisor</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f4f2ef;
+      color: #2d2a26;
+    }
+    body { display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    header {
+      flex-shrink: 0;
+      background: #2d2a26;
+      color: #f4f2ef;
+      padding: 0 24px;
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+    header .subtitle { font-size: 13px; color: #7a756e; margin-top: 1px; }
+
+    /* ── Form bar ── */
+    .form-bar {
+      flex-shrink: 0;
+      background: #fff;
+      border-bottom: 1px solid #e8e4df;
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: flex-end;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #6b6560;
+    }
+    .field select, .field input {
+      height: 36px;
+      padding: 0 11px;
+      border: 1px solid #d4cfc9;
+      border-radius: 6px;
+      background: #faf9f7;
+      font-size: 13.5px;
+      color: #2d2a26;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field select:focus, .field input:focus { border-color: #5c7a5c; }
+    .field select { min-width: 210px; cursor: pointer; }
+    .field input { width: 130px; }
+
+    .horizon-group { display: flex; gap: 5px; }
+    .horizon-group label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 0 14px;
+      height: 36px;
+      border: 1px solid #d4cfc9;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13.5px;
+      background: #faf9f7;
+      color: #2d2a26;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .horizon-group input[type=radio] { display: none; }
+    .horizon-group label.active {
+      background: #2d2a26;
+      border-color: #2d2a26;
+      color: #f4f2ef;
+      font-weight: 600;
+    }
+
+    .submit-btn {
+      height: 36px;
+      padding: 0 22px;
+      background: #5c7a5c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+    }
+    .submit-btn:hover:not(:disabled) { background: #4a6b4a; }
+    .submit-btn:disabled { background: #a8b8a8; cursor: not-allowed; }
+
+    /* ── Main content ── */
+    .content {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    }
+
+    /* ── Map ── */
+    #map { flex: 1; min-width: 0; }
+
+    /* ── Results panel ── */
+    .results-panel {
+      width: 420px;
+      flex-shrink: 0;
+      background: #fff;
+      border-left: 1px solid #e8e4df;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .results-header {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e8e4df;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .results-header h2 { font-size: 13px; font-weight: 700; white-space: nowrap; }
+    .results-header span { font-size: 12px; color: #9d9890; text-align: right; }
+
+    .placeholder {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #b8b0a8;
+    }
+    .placeholder p { font-size: 13px; }
+
+    .table-wrapper { flex: 1; overflow-y: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f4f2ef;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6b6560;
+      border-bottom: 1px solid #e8e4df;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { background: #ebe8e3; }
+    thead th.sort-asc::after  { content: ' ↑'; opacity: 0.7; }
+    thead th.sort-desc::after { content: ' ↓'; opacity: 0.7; }
+
+    tbody tr {
+      border-bottom: 1px solid #f0ece7;
+      cursor: pointer;
+      transition: background 0.08s;
+    }
+    tbody tr:hover      { background: #faf9f7; }
+    tbody tr.highlight  { background: #eef4ee !important; }
+
+    td { padding: 8px 10px; white-space: nowrap; vertical-align: middle; }
+    td.rank   { color: #aaa9a4; font-size: 11.5px; width: 28px; padding-right: 4px; }
+    td.county { font-weight: 600; font-size: 13px; }
+
+    .tier-badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 100px;
+      font-size: 10.5px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .t-strong   { background: #dcfce7; color: #166534; }
+    .t-cautious { background: #d1fae5; color: #065f46; }
+    .t-watch    { background: #fef9c3; color: #854d0e; }
+    .t-avoid    { background: #fee2e2; color: #991b1b; }
+
+    .score-cell { display: flex; align-items: center; gap: 7px; }
+    .score-val  { min-width: 34px; font-variant-numeric: tabular-nums; }
+    .bar-track  { width: 52px; height: 5px; background: #e8e4df; border-radius: 3px; overflow: hidden; }
+    .bar-fill   { height: 100%; border-radius: 3px; }
+
+    /* ── Map legend ── */
+    .map-legend {
+      background: #fff;
+      padding: 9px 12px;
+      border-radius: 7px;
+      border: 1px solid #e8e4df;
+      font-size: 11.5px;
+      line-height: 1.9;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .legend-row  { display: flex; align-items: center; gap: 7px; }
+    .legend-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Map tooltip ── */
+    .leaflet-tooltip {
+      background: #2d2a26 !important;
+      color: #f4f2ef !important;
+      border: none !important;
+      border-radius: 7px !important;
+      padding: 8px 13px !important;
+      font-size: 13px !important;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.3) !important;
+      pointer-events: none;
+    }
+    .leaflet-tooltip::before { display: none !important; }
+    .tt-name   { font-weight: 700; margin-bottom: 3px; }
+    .tt-detail { font-size: 11.5px; color: #b0a89e; line-height: 1.6; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Loading overlay on map ── */
+    .map-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(244,242,239,0.7);
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #5c7a5c;
+      font-weight: 600;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .map-loading .spinner {
+      border-color: rgba(92,122,92,0.3);
+      border-top-color: #5c7a5c;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+    <circle cx="11" cy="11" r="10.5" fill="#5c7a5c"/>
+    <path d="M5.5 15.5L8.5 9.5L11 13L14 7.5L17 12" stroke="#f4f2ef" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>
+  <h1>TerraTrends</h1>
+  <span class="subtitle">Georgia County Expansion Advisor</span>
+</header>
+
+<div class="form-bar">
+  <div class="field">
+    <label>Sector</label>
+    <select id="sector">
+      <option>Accommodation and food services</option>
+      <option>Administrative and support and waste management and remediation services</option>
+      <option>Agriculture, forestry, fishing and hunting</option>
+      <option>Arts, entertainment, and recreation</option>
+      <option>Construction</option>
+      <option>Durable goods manufacturing</option>
+      <option>Educational services</option>
+      <option>Finance and insurance</option>
+      <option>Government and government enterprises</option>
+      <option selected>Health care and social assistance</option>
+      <option>Information</option>
+      <option>Natural resources and mining</option>
+      <option>Nondurable goods manufacturing</option>
+      <option>Other services (except government and government enterprises)</option>
+      <option>Professional and business services</option>
+      <option>Real estate and rental and leasing</option>
+      <option>Retail trade</option>
+      <option>Transportation and warehousing</option>
+      <option>Utilities</option>
+      <option>Wholesale trade</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Annual Revenue ($)</label>
+    <input type="number" id="revenue" value="800000" min="0" step="10000">
+  </div>
+
+  <div class="field">
+    <label>Employees</label>
+    <input type="number" id="employees" value="25" min="1">
+  </div>
+
+  <div class="field">
+    <label>Founded</label>
+    <input type="number" id="founding_year" value="2010" min="1900" max="2025">
+  </div>
+
+  <div class="field">
+    <label>Horizon</label>
+    <div class="horizon-group">
+      <label id="lbl-1y"><input type="radio" name="horizon" value="1y"><span>1 yr</span></label>
+      <label id="lbl-3y" class="active"><input type="radio" name="horizon" value="3y" checked><span>3 yr</span></label>
+      <label id="lbl-5y"><input type="radio" name="horizon" value="5y"><span>5 yr</span></label>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="runPrediction()">Analyze →</button>
+</div>
+
+<div class="content">
+  <div style="position:relative;flex:1;min-width:0;">
+    <div id="map" style="width:100%;height:100%;"></div>
+    <div id="map-loading" class="map-loading" style="display:none">
+      <span class="spinner"></span> Scoring 159 counties…
+    </div>
+  </div>
+
+  <div class="results-panel">
+    <div class="results-header">
+      <h2 id="panel-title">Results</h2>
+      <span id="panel-sub">Fill in your details and click Analyze</span>
+    </div>
+
+    <div id="placeholder" class="placeholder">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none"
+           stroke="#ccc" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7"/>
+        <path d="M9 7l6-3m-6 3v13m6-10l4.553-2.276A1 1 0 0121 5.618v10.764a1 1 0 01-.553.894L15 20"/>
+        <path d="M15 7v13"/>
+      </svg>
+      <p>No results yet</p>
+    </div>
+
+    <div id="table-wrap" class="table-wrapper" style="display:none">
+      <table>
+        <thead>
+          <tr>
+            <th data-col="rank">#</th>
+            <th data-col="county">County</th>
+            <th data-col="score">Score</th>
+            <th data-col="tier">Tier</th>
+            <th data-col="survival_prob">Survival</th>
+            <th data-col="projected_revenue">Revenue</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Horizon radio active state ─────────────────────────────────────────
+document.querySelectorAll('input[name=horizon]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('.horizon-group label').forEach(l => l.classList.remove('active'));
+    r.closest('label').classList.add('active');
+  });
+});
+
+// ── Map init ───────────────────────────────────────────────────────────
+const map = L.map('map', { center: [32.65, -83.4], zoom: 7, zoomControl: true });
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains: 'abcd', maxZoom: 13,
+}).addTo(map);
+
+let geojsonLayer = null;
+let geojsonData  = null;
+let countyMap    = {};   // "Forsyth" → result row
+let allResults   = [];
+let sortState    = { col: 'rank', asc: true };
+
+// Color: red → amber → green based on 0–100 score
+function scoreColor(score) {
+  if (score == null) return '#ddd';
+  const t = Math.max(0, Math.min(1, score / 100));
+  let r, g, b;
+  if (t < 0.5) {
+    const s = t * 2;
+    r = Math.round(220 + (251 - 220) * s);
+    g = Math.round(38  + (146 - 38)  * s);
+    b = Math.round(38  + (11  - 38)  * s);
+  } else {
+    const s = (t - 0.5) * 2;
+    r = Math.round(251 + (34  - 251) * s);
+    g = Math.round(146 + (197 - 146) * s);
+    b = Math.round(11  + (94  - 11)  * s);
+  }
+  return `rgb(${r},${g},${b})`;
+}
+
+function tierClass(tier) {
+  if (!tier) return '';
+  if (tier.startsWith('Strong'))   return 't-strong';
+  if (tier.startsWith('Cautious')) return 't-cautious';
+  if (tier.startsWith('Watch'))    return 't-watch';
+  return 't-avoid';
+}
+
+function styleFeature(f) {
+  const row = countyMap[f.properties.NAME];
+  return {
+    fillColor:   row ? scoreColor(row.score) : '#e8e4df',
+    fillOpacity: row ? 0.78 : 0.35,
+    color:       '#fff',
+    weight:      0.8,
+  };
+}
+
+function onEachFeature(f, layer) {
+  const name = f.properties.NAME;
+  layer.on({
+    mouseover(e) {
+      layer.setStyle({ weight: 2, color: '#2d2a26', fillOpacity: 0.9 });
+      const row = countyMap[name];
+      let html;
+      if (row) {
+        html = `<div class="tt-name">${name} County</div>
+                <div class="tt-detail">
+                  Score: <b>${row.score}</b> &nbsp;·&nbsp; ${row.tier}<br>
+                  Survival: ${(row.survival_prob * 100).toFixed(0)}% &nbsp;·&nbsp;
+                  Growth: ${row.sector_growth_pct > 0 ? '+' : ''}${row.sector_growth_pct}%
+                </div>`;
+      } else {
+        html = `<div class="tt-name">${name} County</div><div class="tt-detail">No data</div>`;
+      }
+      layer.bindTooltip(html, { sticky: true, opacity: 1 }).openTooltip();
+    },
+    mouseout() {
+      geojsonLayer.resetStyle(layer);
+      layer.closeTooltip();
+    },
+    click() {
+      if (!countyMap[name]) return;
+      scrollToRow(name);
+    },
+  });
+}
+
+// Load Georgia counties GeoJSON (filtered from Plotly's public US dataset)
+fetch('https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json')
+  .then(r => r.json())
+  .then(d => {
+    geojsonData = {
+      type: 'FeatureCollection',
+      features: d.features.filter(f => f.id && f.id.startsWith('13')),
+    };
+    renderMap();
+    addLegend();
+  })
+  .catch(() => console.warn('Could not load county boundaries'));
+
+function renderMap() {
+  if (geojsonLayer) map.removeLayer(geojsonLayer);
+  if (!geojsonData)  return;
+  geojsonLayer = L.geoJSON(geojsonData, { style: styleFeature, onEachFeature }).addTo(map);
+}
+
+// Legend
+let legendCtrl = null;
+function addLegend() {
+  if (legendCtrl) legendCtrl.remove();
+  legendCtrl = L.control({ position: 'bottomleft' });
+  legendCtrl.onAdd = () => {
+    const div = L.DomUtil.create('div', 'map-legend');
+    const hasData = Object.keys(countyMap).length > 0;
+    if (hasData) {
+      div.innerHTML = `
+        <div style="font-weight:700;margin-bottom:5px;font-size:11px;color:#2d2a26">SCORE</div>
+        <div class="legend-row"><div class="legend-swatch" style="background:${scoreColor(88)}"></div>High (75–100)</div>
+        <div class="legend-row"><div class="legend-swatch" style="background:${scoreColor(62)}"></div>Good (50–75)</div>
+        <div class="legend-row"><div class="legend-swatch" style="background:${scoreColor(37)}"></div>Moderate (25–50)</div>
+        <div class="legend-row"><div class="legend-swatch" style="background:${scoreColor(12)}"></div>Low (0–25)</div>`;
+    } else {
+      div.innerHTML = `
+        <div style="font-weight:700;font-size:11px;color:#2d2a26">GEORGIA COUNTIES</div>
+        <div style="font-size:11px;color:#9d9890;margin-top:3px">Run analysis to see scores</div>`;
+    }
+    return div;
+  };
+  legendCtrl.addTo(map);
+}
+
+// ── Prediction ─────────────────────────────────────────────────────────
+async function runPrediction() {
+  const btn    = document.getElementById('submit-btn');
+  const sector = document.getElementById('sector').value;
+  const revenue       = parseFloat(document.getElementById('revenue').value)      || 0;
+  const employees     = parseInt(document.getElementById('employees').value)      || 1;
+  const founding_year = parseInt(document.getElementById('founding_year').value)  || 2010;
+  const horizon = document.querySelector('input[name=horizon]:checked').value;
+
+  btn.disabled    = true;
+  btn.innerHTML   = '<span class="spinner"></span>';
+  document.getElementById('map-loading').style.display = 'flex';
+  document.getElementById('panel-sub').textContent = 'Scoring 159 counties…';
+
+  try {
+    const res = await fetch('http://localhost:8000/analysis/predict', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ sector, revenue, employee_count: employees, founding_year, horizon }),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    allResults = await res.json();
+
+    // Build name lookup (strip ", GA")
+    countyMap = {};
+    allResults.forEach(row => {
+      countyMap[row.county.replace(', GA', '')] = row;
+    });
+
+    renderMap();
+    addLegend();
+    renderTable(allResults);
+
+    const top = allResults[0]?.county || '';
+    const shortSector = sector.split(' ').slice(0, 4).join(' ') + (sector.split(' ').length > 4 ? '…' : '');
+    document.getElementById('panel-title').textContent = `${shortSector} · ${horizon.toUpperCase()}`;
+    document.getElementById('panel-sub').textContent   = `159 counties · Top: ${top}`;
+
+  } catch (err) {
+    document.getElementById('panel-sub').textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled  = false;
+    btn.innerHTML = 'Analyze →';
+    document.getElementById('map-loading').style.display = 'none';
+  }
+}
+
+// ── Table rendering ────────────────────────────────────────────────────
+function renderTable(data) {
+  document.getElementById('placeholder').style.display = 'none';
+  document.getElementById('table-wrap').style.display  = '';
+
+  document.getElementById('tbody').innerHTML = data.map(row => {
+    const name   = row.county.replace(', GA', '');
+    const safeId = 'r-' + name.replace(/[\s,]/g, '_');
+    const score  = row.score != null ? row.score : 0;
+    const surv   = row.survival_prob != null ? `${(row.survival_prob * 100).toFixed(0)}%` : '—';
+    const rev    = row.projected_revenue != null
+                   ? '$' + (row.projected_revenue >= 1e6
+                       ? (row.projected_revenue / 1e6).toFixed(2) + 'M'
+                       : (row.projected_revenue / 1e3).toFixed(0) + 'k')
+                   : '—';
+    const tc = tierClass(row.tier);
+    return `<tr id="${safeId}" onclick="highlightRow('${name}')">
+      <td class="rank">${row.rank}</td>
+      <td class="county">${name}</td>
+      <td>
+        <div class="score-cell">
+          <span class="score-val">${score.toFixed(1)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${score}%;background:${scoreColor(score)}"></div></div>
+        </div>
+      </td>
+      <td><span class="tier-badge ${tc}">${row.tier || '—'}</span></td>
+      <td>${surv}</td>
+      <td>${rev}</td>
+    </tr>`;
+  }).join('');
+}
+
+function scrollToRow(name) {
+  document.querySelectorAll('tbody tr.highlight').forEach(r => r.classList.remove('highlight'));
+  const safeId = 'r-' + name.replace(/[\s,]/g, '_');
+  const el = document.getElementById(safeId);
+  if (el) {
+    el.classList.add('highlight');
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function highlightRow(name) {
+  scrollToRow(name);
+  // Pulse the county on the map
+  if (geojsonLayer) {
+    geojsonLayer.eachLayer(layer => {
+      if (layer.feature?.properties?.NAME === name) {
+        layer.setStyle({ weight: 2.5, color: '#2d2a26' });
+        setTimeout(() => geojsonLayer.resetStyle(layer), 1500);
+      }
+    });
+  }
+}
+
+// ── Column sorting ─────────────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const th = e.target.closest('thead th[data-col]');
+  if (!th || !allResults.length) return;
+
+  const col = th.dataset.col;
+  if (sortState.col === col) {
+    sortState.asc = !sortState.asc;
+  } else {
+    sortState.col = col;
+    sortState.asc = (col === 'rank' || col === 'county');
+  }
+
+  document.querySelectorAll('thead th').forEach(h => h.classList.remove('sort-asc', 'sort-desc'));
+  th.classList.add(sortState.asc ? 'sort-asc' : 'sort-desc');
+
+  const sorted = [...allResults].sort((a, b) => {
+    const av = a[col] ?? (sortState.asc ? Infinity : -Infinity);
+    const bv = b[col] ?? (sortState.asc ? Infinity : -Infinity);
+    if (typeof av === 'string') return sortState.asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return sortState.asc ? av - bv : bv - av;
+  });
+  renderTable(sorted);
+});
+</script>
+</body>
+</html>
